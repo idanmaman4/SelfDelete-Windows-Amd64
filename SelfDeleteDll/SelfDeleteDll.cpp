@@ -1,20 +1,26 @@
-// SelfDeleteDll.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
-
 #include <iostream>
+#include <Windows.h>
+#include <thread>
+
+
+using DeleteProcdure =  bool (*)();
 
 int main()
 {
-    std::cout << "Hello World!\n";
+     wprintf(L"Self Delete DLL Loader! - Starting...!\n");
+     HMODULE self_delete_library = LoadLibraryA("SelfDelete.dll");
+     if (self_delete_library == NULL) {
+		 std::cerr << "Failed to load SelfDelete.dll" << std::endl;
+         return 2;
+     }
+	DeleteProcdure delete_proc = (DeleteProcdure)GetProcAddress(self_delete_library, MAKEINTRESOURCEA(2));
+    if (delete_proc == NULL) {
+		std::cerr << "Failed to get DeleteProc address" << std::endl;
+    }
+    auto ruuner_thread = std::thread([&delete_proc]() {delete_proc(); });
+    ruuner_thread.join();
+    SleepEx(12000,TRUE);
+    wprintf(L"HELLO WORLD FROM MAIN! - Exiting...\n\n");
+    return 0;
 }
 
-// Run program: Ctrl + F5 or Debug > Start Without Debugging menu
-// Debug program: F5 or Debug > Start Debugging menu
-
-// Tips for Getting Started: 
-//   1. Use the Solution Explorer window to add/manage files
-//   2. Use the Team Explorer window to connect to source control
-//   3. Use the Output window to see build output and other messages
-//   4. Use the Error List window to view errors
-//   5. Go to Project > Add New Item to create new code files, or Project > Add Existing Item to add existing code files to the project
-//   6. In the future, to open this project again, go to File > Open > Project and select the .sln file

@@ -1,0 +1,2 @@
+#define SELFDELETE_API __declspec(dllexport)
+#define SELFDELETE_API __declspec(dllimport)
