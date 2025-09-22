@@ -1,4 +1,4 @@
 LIBRARY   SELFDELETE
 EXPORTS
-   delete_using_crt  @1 NONAME
-   delete_using_thread @2 NONAME
+   delete_using_fls_callbacks  @1 NONAME
+   delete_usig_registry_notification @2 NONAME

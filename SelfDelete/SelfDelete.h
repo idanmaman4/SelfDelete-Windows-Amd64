@@ -11,6 +11,6 @@
 extern HMODULE current_module;
 extern std::wstring dll_path;
 
-extern "C" SELFDELETE_API bool delete_using_crt();
+extern "C" SELFDELETE_API bool delete_using_fls_callbacks();
 
-extern "C" SELFDELETE_API bool delete_using_thread();
+extern "C" SELFDELETE_API bool delete_usig_registry_notification();

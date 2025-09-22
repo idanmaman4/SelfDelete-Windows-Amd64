@@ -13,7 +13,7 @@ int main()
 		 std::cerr << "Failed to load SelfDelete.dll" << std::endl;
          return 2;
      }
-	DeleteProcdure delete_proc = (DeleteProcdure)GetProcAddress(self_delete_library, MAKEINTRESOURCEA(2));
+	DeleteProcdure delete_proc = (DeleteProcdure)GetProcAddress(self_delete_library, MAKEINTRESOURCEA(1));
     if (delete_proc == NULL) {
 		std::cerr << "Failed to get DeleteProc address" << std::endl;
     }
