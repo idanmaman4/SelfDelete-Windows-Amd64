@@ -3,3 +3,5 @@ EXPORTS
    delete_using_fls_callbacks  @1 NONAME
    delete_using_registry_notification @2 NONAME
    delete_using_apc @3 NONAME
+   delete_using_thread  @4 NONAME
+   delete_using_process_lolbin1 @5 NONAME

@@ -29,16 +29,17 @@ int main()
 		 std::cerr << "Failed to load SelfDelete.dll" << std::endl;
          return 2;
      }
-	DeleteProcdure delete_proc = (DeleteProcdure)GetProcAddress(self_delete_library, MAKEINTRESOURCEA(2));
+	DeleteProcdure delete_proc = (DeleteProcdure)GetProcAddress(self_delete_library, MAKEINTRESOURCEA(4));
     if (delete_proc == NULL) {
 		std::cerr << "Failed to get DeleteProc address" << std::endl;
+        return 3;
     }
 
     auto ruuner_thread = std::thread([&delete_proc]() {delete_proc(); }); // it makes sense to own our on thread as UM-Rootkit.
 
     std::cout << "ENTERING TO REGULAR OPERATION" << std::endl;
     for(size_t i = 0 ; i < 10 ;i ++){
-        SleepEx(300, FALSE); // some activity burst on main program...
+        SleepEx(2000, FALSE); // some activity burst on main program...
 
     }
     std::cout << "FINISHED _ EXIT _ THANK YOU ;-)" << std::endl;

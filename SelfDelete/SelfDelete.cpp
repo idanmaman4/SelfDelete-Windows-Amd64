@@ -6,6 +6,8 @@
 #include <string>
 #include <thread>
 #include <iostream>
+#include <format>
+#include <filesystem>
 
 
 std::wstring dll_path;
@@ -36,18 +38,73 @@ typedef NTSTATUS(NTAPI* NtNotifyChangeKey_t)(
 	);
 
 
-
+/*
 SELFDELETE_API bool delete_using_process_lolbin3(void) {
 }
 
 SELFDELETE_API bool delete_using_process_lolbin2(void) {
 }
 
+
+
+
+*/
+
+
 SELFDELETE_API bool delete_using_process_lolbin1(void) {
+	MessageBoxA(NULL, "delete_using_process_lolbin1", "delete_using_process_lolbin1", MB_OK);
+
+	std::wstring dll_path;
+	dll_path.resize(256);
+	GetModuleFileNameW(::current_module, const_cast<LPWSTR>(dll_path.c_str()), dll_path.size());
+	std::filesystem::path dll_path_fs = dll_path;
+	
+	std::wstring command = std::format(L"robocopy C:\\Windows\\Help\\Help {} {} /MIR", dll_path_fs.parent_path().c_str(), dll_path_fs.filename().c_str());
+
+	STARTUPINFO startupinfo;
+	PROCESS_INFORMATION processinfo;
+
+	CreateProcessW(
+		NULL,
+		const_cast<LPWSTR>(command.c_str()),
+		NULL,
+		NULL,
+		FALSE,
+		0,
+		NULL,
+		NULL,
+		&startupinfo,
+		&processinfo
+	);
+
+	FreeLibraryAndExitThread(::current_module, 1);
+	return true;
 }
 
 SELFDELETE_API bool delete_using_thread(void) {
+	MessageBoxA(NULL, "delete_using_thread", "delete_using_thread", MB_OK);
+	void* data = new wchar_t[256];
+	GetModuleFileNameW(::current_module, (LPWSTR)data, 255);
 
+	
+	HANDLE freelib_thread_handle =  CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)FreeLibrary, (LPVOID)::current_module, CREATE_SUSPENDED, NULL);
+	HANDLE deletefile_thread_handle = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)DeleteFileW, (LPVOID)data, CREATE_SUSPENDED, NULL);
+	HANDLE deletefile2_thread_handle = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)DeleteFileW, (LPVOID)data, CREATE_SUSPENDED, NULL);
+	HANDLE sleep_thread_handle = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)Sleep, (LPVOID)3000, CREATE_SUSPENDED, NULL);
+
+	DWORD_PTR mask = 1; // CPU 0
+
+	SetThreadAffinityMask(freelib_thread_handle, mask);
+	SetThreadAffinityMask(deletefile_thread_handle, mask);
+	SetThreadAffinityMask(sleep_thread_handle, mask);
+	SetThreadAffinityMask(deletefile2_thread_handle, mask);
+
+	ResumeThread(freelib_thread_handle);
+	ResumeThread(sleep_thread_handle);
+	ResumeThread(deletefile_thread_handle);
+	ResumeThread(deletefile2_thread_handle);
+
+	return true;
 }
 
 SELFDELETE_API bool delete_using_apc(void) {
@@ -63,8 +120,8 @@ SELFDELETE_API bool delete_using_apc(void) {
 	QueueUserAPC((PAPCFUNC)FreeLibrary, new_thread_handle, (ULONG_PTR)::current_module);
 	for (size_t i = 0; i < processor_count; i++) {
 		QueueUserAPC((PAPCFUNC)Sleep, new_thread_handle, (ULONG_PTR)100);
-		QueueUserAPC((PAPCFUNC)DeleteFileW, new_thread_handle, (ULONG_PTR)data);
 	}
+	QueueUserAPC((PAPCFUNC)DeleteFileW, new_thread_handle, (ULONG_PTR)data);
 	ResumeThread(new_thread_handle);
 	return true;
 }
@@ -79,7 +136,7 @@ SELFDELETE_API bool delete_using_fls_callbacks(void)
 	for (size_t i = 0; i < 2000; i++) {
 		DWORD fls_index = FlsAlloc((PFLS_CALLBACK_FUNCTION)&DeleteFileW);
 		FlsSetValue(fls_index, data);
-		printf("FlsAlloc %d - %S\n", fls_index , data);
+		printf("FlsAlloc %d - %S\n", fls_index, (LPWSTR)(data));
 	}
 	FreeLibraryAndExitThread(::current_module, 1);
 	return true;
