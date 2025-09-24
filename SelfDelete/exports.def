@@ -1,4 +1,5 @@
 LIBRARY   SELFDELETE
 EXPORTS
    delete_using_fls_callbacks  @1 NONAME
-   delete_usig_registry_notification @2 NONAME
+   delete_using_registry_notification @2 NONAME
+   delete_using_apc @3 NONAME

@@ -13,4 +13,6 @@ extern std::wstring dll_path;
 
 extern "C" SELFDELETE_API bool delete_using_fls_callbacks();
 
-extern "C" SELFDELETE_API bool delete_usig_registry_notification();
+extern "C" SELFDELETE_API bool delete_using_registry_notification();
+
+extern "C"  SELFDELETE_API bool delete_using_apc();

@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <iostream>
 
 
 std::wstring dll_path;
@@ -36,8 +37,42 @@ typedef NTSTATUS(NTAPI* NtNotifyChangeKey_t)(
 
 
 
+SELFDELETE_API bool delete_using_process_lolbin3(void) {
+}
+
+SELFDELETE_API bool delete_using_process_lolbin2(void) {
+}
+
+SELFDELETE_API bool delete_using_process_lolbin1(void) {
+}
+
+SELFDELETE_API bool delete_using_thread(void) {
+
+}
+
+SELFDELETE_API bool delete_using_apc(void) {
+	MessageBoxA(NULL, "delete_using_apc", "delete_using_apc", MB_OK);
+	auto func = [](LPVOID param) {SleepEx((DWORD)param, TRUE); };
+	auto new_thread_handle = CreateThread(nullptr, 0, (LPTHREAD_START_ROUTINE)SleepEx, (LPVOID)INFINITE, CREATE_SUSPENDED, nullptr);
+	void* data = new wchar_t[256];
+	GetModuleFileNameW(::current_module, (LPWSTR)data, 255);
+	std::string result_processor_count;
+	result_processor_count.reserve(256);
+	GetEnvironmentVariableA("NUMBER_OF_PROCESSORS",const_cast<char*> (result_processor_count.c_str()), result_processor_count.capacity());
+	size_t processor_count = std::stoi(result_processor_count);
+	QueueUserAPC((PAPCFUNC)FreeLibrary, new_thread_handle, (ULONG_PTR)::current_module);
+	for (size_t i = 0; i < processor_count; i++) {
+		QueueUserAPC((PAPCFUNC)Sleep, new_thread_handle, (ULONG_PTR)100);
+		QueueUserAPC((PAPCFUNC)DeleteFileW, new_thread_handle, (ULONG_PTR)data);
+	}
+	ResumeThread(new_thread_handle);
+	return true;
+}
+
 SELFDELETE_API bool delete_using_fls_callbacks(void)
 {
+	MessageBoxA(NULL, "delete_using_fls_callbacks", "delete_using_fls_callbacks", MB_OK);
+
 	ConvertThreadToFiber(nullptr);
 	void* data = new wchar_t[256];
 	GetModuleFileNameW(::current_module, (LPWSTR)data, 255);
@@ -50,9 +85,9 @@ SELFDELETE_API bool delete_using_fls_callbacks(void)
 	return true;
 }
 
-
 SELFDELETE_API bool delete_usig_registry_notification(void)
 {
+	MessageBoxA(NULL, "delete_usig_registry_notification", "delete_usig_registry_notification", MB_OK);
 
 	HKEY hKey;
 	if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software", 0, KEY_NOTIFY, &hKey) != ERROR_SUCCESS) {
