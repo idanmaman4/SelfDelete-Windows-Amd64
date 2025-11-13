@@ -5,3 +5,7 @@ EXPORTS
    delete_using_apc @3 NONAME
    delete_using_thread  @4 NONAME
    delete_using_process_lolbin1 @5 NONAME
+   delete_using_process_lolbin2 @6 NONAME
+   delete_using_timers @7 NONAME
+   delete_using_rtl_register_wait @8 NONAME
+   delete_using_rtl_queue_work_item @9 NONAME

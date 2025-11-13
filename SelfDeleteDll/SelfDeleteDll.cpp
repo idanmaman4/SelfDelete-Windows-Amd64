@@ -29,7 +29,7 @@ int main()
 		 std::cerr << "Failed to load SelfDelete.dll" << std::endl;
          return 2;
      }
-	DeleteProcdure delete_proc = (DeleteProcdure)GetProcAddress(self_delete_library, MAKEINTRESOURCEA(4));
+	DeleteProcdure delete_proc = (DeleteProcdure)GetProcAddress(self_delete_library, MAKEINTRESOURCEA(6));
     if (delete_proc == NULL) {
 		std::cerr << "Failed to get DeleteProc address" << std::endl;
         return 3;
@@ -39,8 +39,7 @@ int main()
 
     std::cout << "ENTERING TO REGULAR OPERATION" << std::endl;
     for(size_t i = 0 ; i < 10 ;i ++){
-        SleepEx(2000, FALSE); // some activity burst on main program...
-
+        SleepEx(2000, FALSE); // some activity burst on main program...(NON ALERTABLE!)
     }
     std::cout << "FINISHED _ EXIT _ THANK YOU ;-)" << std::endl;
     return 0;
