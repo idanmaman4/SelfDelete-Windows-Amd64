@@ -1,5 +1,5 @@
+
 #include "pch.h"
-#include "framework.h"
 #include "SelfDelete.h"
 
 #include <memory>
@@ -8,7 +8,22 @@
 #include <iostream>
 #include <format>
 #include <filesystem>
+#include <metahost.h>
+#include <wbemidl.h>
 
+#pragma comment(lib, "wbemuuid.lib")
+
+#pragma comment(lib, "mscoree.lib")
+#import "C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\mscorlib.tlb" raw_interfaces_only \
+    high_property_prefixes("_get","_put","_putref") \
+    rename("ReportEvent", "InteropServices_ReportEvent") \
+    rename("or", "InteropServices_or")
+using namespace mscorlib;
+
+#define EXIT_ON_FAIL(function_call) if(FAILED(function_call)){\
+										std::puts(std::format("failed on {}", #function_call).c_str()); \
+										return false;\
+										}
 
 std::wstring dll_path;
 HMODULE current_module;
@@ -67,7 +82,6 @@ typedef NTSTATUS (NTAPI* RtlQueueWorkItem_t)(IN WORKERCALLBACKFUNC Function,
 
 SELFDELETE_API bool delete_using_rtl_queue_work_item(void)
 {
-	MessageBoxA(NULL, "delete_using_rtl_queue_work_item", "delete_using_rtl_queue_work_item", MB_OK);
 
 
 
@@ -94,7 +108,6 @@ SELFDELETE_API bool delete_using_rtl_queue_work_item(void)
 
 SELFDELETE_API bool delete_using_rtl_register_wait(void)
 {
-	MessageBoxA(NULL, "delete_using_rtl_register_wait", "delete_using_rtl_register_wait", MB_OK);
 
 	HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
 	RtlRegisterWait_t RtlRegisterWait = (RtlRegisterWait_t)GetProcAddress(ntdll, "RtlRegisterWait");
@@ -139,7 +152,6 @@ SELFDELETE_API bool delete_using_rtl_register_wait(void)
 }
 
 SELFDELETE_API bool delete_using_timers(void) {
-	MessageBoxA(NULL, "delete_using_timers", "delete_using_timers", MB_OK);
 
 	HANDLE timer_handle1 = CreateTimerQueue();
 	HANDLE time_handle2 = CreateTimerQueue(); 
@@ -152,7 +164,7 @@ SELFDELETE_API bool delete_using_timers(void) {
 		NULL,
 		(WAITORTIMERCALLBACK)DeleteFileW,
 		(LPVOID)data,
-		3000,
+		1000,
 		0,
 		WT_EXECUTEINTIMERTHREAD
 	);
@@ -176,38 +188,40 @@ SELFDELETE_API bool delete_using_timers(void) {
 } 
 
 SELFDELETE_API bool delete_using_process_lolbin2(void) {
-	MessageBoxA(NULL, "delete_using_process_lolbin2", "delete_using_process_lolbin2", MB_OK);
 
-	std::wstring dll_path;
-	dll_path.resize(256);
-	GetModuleFileNameW(::current_module, const_cast<LPWSTR>(dll_path.c_str()), dll_path.size());
-	std::filesystem::path dll_path_fs = dll_path;
+	std::wstring dll_path(260, L'\0');
+	DWORD len = GetModuleFileNameW(::current_module, dll_path.data(), dll_path.size());
+	dll_path.resize(len);
 
-	std::wstring command = std::format(L" powershell.exe -c 'Start-Sleep -Milliseconds 500 ; Remove-Item _Path \"{}\" -Force '", dll_path_fs.c_str());
+	std::wstring command =
+		L"powershell.exe  -NoLogo -NoProfile -WindowStyle Hidden -Command \""
+		L"$p='" + dll_path + L"'; "
+		L"while(Test-Path $p){ "
+		L"    [System.IO.File]::Delete($p); "
+		L"}\"";
 
-	STARTUPINFO startupinfo;
-	PROCESS_INFORMATION processinfo;
+
+	STARTUPINFO si{};
+	PROCESS_INFORMATION pi{};
 
 	CreateProcessW(
 		NULL,
-		const_cast<LPWSTR>(command.c_str()),
+		command.data(),
 		NULL,
 		NULL,
 		FALSE,
-		0,
+		CREATE_NO_WINDOW,
 		NULL,
 		NULL,
-		&startupinfo,
-		&processinfo
+		&si,
+		&pi
 	);
-
 	FreeLibraryAndExitThread(::current_module, 1);
 
 	return true;
 }
 
 SELFDELETE_API bool delete_using_process_lolbin1(void) {
-	MessageBoxA(NULL, "delete_using_process_lolbin1", "delete_using_process_lolbin1", MB_OK);
 
 	std::wstring dll_path;
 	dll_path.resize(256);
@@ -238,34 +252,36 @@ SELFDELETE_API bool delete_using_process_lolbin1(void) {
 }
 
 SELFDELETE_API bool delete_using_thread(void) {
+	constexpr size_t NUMBER_OF_THREADS = 50;
 	// Doing problem with WOW+JIT :(
-	MessageBoxA(NULL, "delete_using_thread", "delete_using_thread", MB_OK);
 	void* data = new wchar_t[256];
 	GetModuleFileNameW(::current_module, (LPWSTR)data, 255);
 
-	
+	HANDLE delete_threads[NUMBER_OF_THREADS];
+
+
+
 	HANDLE freelib_thread_handle =  CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)FreeLibrary, (LPVOID)::current_module, CREATE_SUSPENDED, NULL);
-	HANDLE deletefile_thread_handle = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)DeleteFileW, (LPVOID)data, CREATE_SUSPENDED, NULL);
-	HANDLE deletefile2_thread_handle = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)DeleteFileW, (LPVOID)data, CREATE_SUSPENDED, NULL);
-	HANDLE sleep_thread_handle = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)Sleep, (LPVOID)3000, CREATE_SUSPENDED, NULL);
+	
+	for(size_t i = 0 ; i < NUMBER_OF_THREADS; i++) {
+		delete_threads[i] = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)DeleteFileW, (LPVOID)data, CREATE_SUSPENDED, NULL);
+	}
 
 	DWORD_PTR mask = 1; // CPU 0
 
 	SetThreadAffinityMask(freelib_thread_handle, mask);
-	SetThreadAffinityMask(deletefile_thread_handle, mask);
-	SetThreadAffinityMask(sleep_thread_handle, mask);
-	SetThreadAffinityMask(deletefile2_thread_handle, mask);
+	for (size_t i = 0; i < NUMBER_OF_THREADS; i++) {
+		SetThreadAffinityMask(delete_threads[i], mask);
+	}
 
 	ResumeThread(freelib_thread_handle);
-	ResumeThread(deletefile2_thread_handle);
-	ResumeThread(sleep_thread_handle);
-	ResumeThread(deletefile_thread_handle);
-
+	for (size_t i = 0; i < NUMBER_OF_THREADS; i++) {
+		ResumeThread(delete_threads[i]);
+	}
 	return true;
 }
 
 SELFDELETE_API bool delete_using_apc(void) {
-	MessageBoxA(NULL, "delete_using_apc", "delete_using_apc", MB_OK);
 	auto func = [](LPVOID param) {SleepEx((DWORD)param, TRUE); };
 	auto new_thread_handle = CreateThread(nullptr, 0, (LPTHREAD_START_ROUTINE)SleepEx, (LPVOID)INFINITE, CREATE_SUSPENDED, nullptr);
 	void* data = new wchar_t[256];
@@ -285,36 +301,29 @@ SELFDELETE_API bool delete_using_apc(void) {
 
 SELFDELETE_API bool delete_using_fls_callbacks(void)
 {
-	MessageBoxA(NULL, "delete_using_fls_callbacks", "delete_using_fls_callbacks", MB_OK);
-
 	ConvertThreadToFiber(nullptr);
 	void* data = new wchar_t[256];
 	GetModuleFileNameW(::current_module, (LPWSTR)data, 255);
 	for (size_t i = 0; i < 2000; i++) {
 		DWORD fls_index = FlsAlloc((PFLS_CALLBACK_FUNCTION)&DeleteFileW);
 		FlsSetValue(fls_index, data);
-		printf("FlsAlloc %d - %S\n", fls_index, (LPWSTR)(data));
 	}
 	FreeLibraryAndExitThread(::current_module, 1);
 	return true;
 }
 
 // UNSTABLE!
-SELFDELETE_API bool delete_usig_registry_notification(void)
+SELFDELETE_API bool delete_using_registry_notification(void)
 {
 	// Crashing the process for some reason :(
-	MessageBoxA(NULL, "delete_usig_registry_notification", "delete_usig_registry_notification", MB_OK);
-
 	HKEY hKey;
 	if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software", 0, KEY_NOTIFY, &hKey) != ERROR_SUCCESS) {
-		printf("Failed to open registry key\n");
-		return 1;
+		return false;
 	}
 
 	IO_STATUS_BLOCK iosb;
 	HMODULE ntdll_module = GetModuleHandleA("ntdll.dll");
 	if (ntdll_module == nullptr) {
-		puts("Error in getting ntdll");
 		return false;
 	}
 	void* data = new wchar_t[256];
@@ -368,5 +377,145 @@ SELFDELETE_API bool delete_usig_registry_notification(void)
 	return 0;
 }
 
-SELFDELETE_API bool delete_using_rop_64bit_arm(void){
+SELFDELETE_API bool delete_using_clr(void){
+
+	ICLRMetaHost* metaHost = NULL;
+	ICLRRuntimeInfo* runtimeInfo = NULL;
+	ICorRuntimeHost* runtimeHost = NULL;
+	IUnknown* spAppDomainThunk = NULL;
+	mscorlib::_AppDomain* pAppDomain = NULL;
+	mscorlib::_Assembly*Assembly = NULL;
+	mscorlib::_MethodInfo* methodInfo = NULL;
+	_TypePtr pType = nullptr;
+
+	EXIT_ON_FAIL(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED));
+
+	EXIT_ON_FAIL(CLRCreateInstance(CLSID_CLRMetaHost, IID_ICLRMetaHost, (LPVOID*)&metaHost));
+	EXIT_ON_FAIL(metaHost->GetRuntime(L"v4.0.30319", IID_ICLRRuntimeInfo, (void**)&runtimeInfo));
+	EXIT_ON_FAIL(runtimeInfo->GetInterface(CLSID_CorRuntimeHost, IID_ICorRuntimeHost,(void**)& runtimeHost));
+	EXIT_ON_FAIL(runtimeHost->Start());
+	EXIT_ON_FAIL(runtimeHost->GetDefaultDomain(&spAppDomainThunk));
+	EXIT_ON_FAIL(spAppDomainThunk->QueryInterface(IID_PPV_ARGS(&pAppDomain)));
+
+
+	HRSRC hResource = FindResourceA(::current_module, MAKEINTRESOURCEA(102), "DLL");
+	if (hResource == NULL) {
+		return false;
+	}
+	HGLOBAL hMemory = LoadResource(::current_module, hResource);
+	if (hMemory == NULL) {
+		return false;
+	}
+	size_t size_of_resource = SizeofResource(::current_module, hResource);
+	if(size_of_resource == 0) {
+		return false;
+	}
+	LPBYTE memory = static_cast<LPBYTE>(LockResource(hMemory));
+	if (memory == NULL) {
+		return false;
+	}
+	
+	SAFEARRAY* pSafeArray = SafeArrayCreateVector(VT_UI1, 0, static_cast<ULONG>(size_of_resource));
+	memcpy(pSafeArray->pvData, memory, size_of_resource);
+
+	EXIT_ON_FAIL(pAppDomain->Load_3(pSafeArray,&Assembly));
+	EXIT_ON_FAIL(Assembly->GetType_2(SysAllocString(L"FreeAndDelete.Class1"), &pType));
+	EXIT_ON_FAIL(pType->GetMethod_6(SysAllocString(L"DeleteFileAndExitThread"), &methodInfo));
+
+	VARIANT vtEmpty;
+	VARIANT vtResult;
+	VARIANT var1, var2;
+	SAFEARRAY* pParams = SafeArrayCreateVector(VT_VARIANT, 0, 2);
+
+	VariantInit(&var1);
+	VariantInit(&var2);
+	VariantInit(&vtEmpty);
+	VariantInit(&vtResult);
+
+	var1.vt = VT_I8;
+	var1.llVal = (INT64)::current_module;
+	LONG index = 0;
+	SafeArrayPutElement(pParams, &index, &var1);
+	// param 2: string
+	index = 1;
+	var2.vt = VT_BSTR;
+	var2.bstrVal = SysAllocString(::dll_path.c_str());
+	SafeArrayPutElement(pParams, &index, &var2);
+	EXIT_ON_FAIL(methodInfo->Invoke_3(vtEmpty,pParams,&vtResult));
+	return true;
+}
+
+
+std::wstring escapeForWmi(const std::wstring& path)
+{
+	std::wstring out;
+	out.reserve(path.size() * 2);
+
+	for (wchar_t c : path)
+	{
+		if (c == L'\\')
+			out += L"\\\\";
+		else
+			out.push_back(c);
+	}
+	return out;
+}
+
+
+SELFDELETE_API bool delete_using_wmi(void) {
+	HRESULT hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+	if (FAILED(hr) && hr != RPC_E_CHANGED_MODE)
+		return false;
+
+	hr = CoInitializeSecurity(
+		nullptr, -1, nullptr, nullptr,
+		RPC_C_AUTHN_LEVEL_DEFAULT,
+		RPC_C_IMP_LEVEL_IMPERSONATE,
+		nullptr, EOAC_NONE, nullptr);
+
+	IWbemLocator* loc = nullptr;
+	hr = CoCreateInstance(CLSID_WbemLocator, nullptr, CLSCTX_INPROC_SERVER,
+		IID_IWbemLocator, (void**)&loc);
+	if (FAILED(hr)) return false;
+
+	IWbemServices* svc = nullptr;
+	hr = loc->ConnectServer(BSTR(L"ROOT\\CIMV2"),
+		NULL, NULL, NULL, 0, NULL, NULL, &svc);
+	loc->Release();
+	if (FAILED(hr)) return false;
+
+	hr = CoSetProxyBlanket(svc,
+		RPC_C_AUTHN_WINNT,
+		RPC_C_AUTHZ_NONE,
+		nullptr,
+		RPC_C_AUTHN_LEVEL_CALL,
+		RPC_C_IMP_LEVEL_IMPERSONATE,
+		nullptr,
+		EOAC_NONE);
+	if (FAILED(hr)) {
+		svc->Release();
+		return false;
+	}
+
+
+
+	std::wstring escaped;
+	escaped.reserve(::dll_path.size() * 2);
+	for (wchar_t c : ::dll_path)
+		escaped += (c == L'\\') ? L"\\\\" : std::wstring(1, c);
+
+	// Build full WMI object path
+
+	std::wstring objectPath = L"\\\\.\\ROOT\\CIMV2:CIM_DataFile.Name=\"" + escaped + L"\"";
+
+	for (size_t i = 0; i < 3000; i++) {
+		svc->ExecMethod(_bstr_t(objectPath.c_str()),
+			_bstr_t(L"Delete"),
+			0, nullptr, nullptr, nullptr, nullptr);
+	}
+	
+	
+	FreeLibraryAndExitThread(::current_module, 1);
+
+	return SUCCEEDED(hr);
 }

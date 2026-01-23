@@ -19,6 +19,7 @@
     <None Include="exports.def">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="..\FreeAndDelete\bin\Release\FreeAndDelete.dll" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -28,6 +29,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="pch.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -41,5 +45,10 @@
     <ClCompile Include="pch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="SelfDelete.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
   </ItemGroup>
 </Project>

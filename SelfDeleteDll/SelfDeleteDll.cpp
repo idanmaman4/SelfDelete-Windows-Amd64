@@ -21,15 +21,17 @@ What this simulation provides:
     A safe environment to practice forensic analysis and to generate synthetic Indicators-of-Behavior (IOBs) for testing.
 */
 
-int main()
+int main(int argc, char * argv[])
 {
+
+    size_t num = std::atoi(argv[1]);
      wprintf(L"Self Delete DLL Loader! - Starting...!\n");
      HMODULE self_delete_library = LoadLibraryA("SelfDelete.dll");
      if (self_delete_library == NULL) {
 		 std::cerr << "Failed to load SelfDelete.dll" << std::endl;
          return 2;
      }
-	DeleteProcdure delete_proc = (DeleteProcdure)GetProcAddress(self_delete_library, MAKEINTRESOURCEA(6));
+	DeleteProcdure delete_proc = (DeleteProcdure)GetProcAddress(self_delete_library, MAKEINTRESOURCEA(num));
     if (delete_proc == NULL) {
 		std::cerr << "Failed to get DeleteProc address" << std::endl;
         return 3;
