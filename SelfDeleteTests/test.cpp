@@ -28,7 +28,7 @@ enum class TestCase : int {
 std::array<std::string_view , (int)TestCase::Max> TestCaseNames = {
 	"FILLER",
 	"FlsCallbacks",
-	"RegistryNotification",
+	//"RegistryNotification",
 	"Apc",
 	"Thread",
 	"ProcessLolbin1",
@@ -45,19 +45,26 @@ constexpr std::wstring_view DLL_ORIG_PATH = L".\\SelfDelete.dll";
 std::filesystem::path PrepareTest(const std::wstring& sourceFilePath) {
 	DWORD pathBufferSize = GetTempPath2W(0, nullptr);
 	if (pathBufferSize == 0) {
+		std::cerr << "Cant't  use temppath2W" << std::endl;
+
 		return {};
 	}
 	std::vector<WCHAR> tempPathBuffer(pathBufferSize);
 	if (GetTempPath2W(pathBufferSize, tempPathBuffer.data()) == 0) {
+		std::cerr << "Cant't get temp path for dll" << std::endl;
+
 		return {};
 	}
 	std::wstring tempPath(tempPathBuffer.data());
 	WCHAR tempFileNameBuffer[MAX_PATH];
 	if (GetTempFileNameW(tempPath.c_str(), L"TMP", 0, tempFileNameBuffer) == 0) {
+		std::cerr << "Cant't create temp name for dll" << std::endl;
+
 		return {};
 	}
 	std::wstring wTempFileName(tempFileNameBuffer);
 	if (!CopyFileW(sourceFilePath.c_str(), wTempFileName.c_str(), FALSE)) {
+		std::cerr << "Cant't copy dll" << std::endl;
 		return {};
 	};
 	return wTempFileName;
@@ -109,13 +116,13 @@ struct TestCaseTag {
 
 typedef ::testing::Types<
 	TestCaseTag<TestCase::FlsCallbacks>,
-	//TestCaseTag<TestCase::RegistryNotification>,
+	TestCaseTag<TestCase::RegistryNotification>,
 	TestCaseTag<TestCase::Apc>,
 	TestCaseTag<TestCase::Thread>,
 	TestCaseTag<TestCase::ProcessLolbin1>,
 	TestCaseTag<TestCase::ProcessLolbin2>,
 	TestCaseTag<TestCase::Timers>,
-	//TestCaseTag<TestCase::RtlRegisterWait>,
+	TestCaseTag<TestCase::RtlRegisterWait>,
 	TestCaseTag<TestCase::RtlQueueWorkItem>,
 	TestCaseTag<TestCase::Clr>
 > AllCases;

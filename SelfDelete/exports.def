@@ -11,4 +11,5 @@ EXPORTS
    delete_using_rtl_register_wait @8 NONAME
    delete_using_rtl_queue_work_item @9 NONAME
    delete_using_clr @10 NONAME
-   delete_using_wmi @11 NONAME
+   delete_using_powershell @11 NONAME
+   delete_using_file_mark @12 NONAME

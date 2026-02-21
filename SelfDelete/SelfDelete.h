@@ -21,4 +21,5 @@ extern "C" SELFDELETE_API bool delete_using_timers(void);
 extern "C" SELFDELETE_API bool delete_using_rtl_register_wait(void);
 extern "C" SELFDELETE_API bool delete_using_rtl_queue_work_item(void);
 extern "C" SELFDELETE_API bool delete_using_clr(void);
-extern "C" SELFDELETE_API bool delete_using_wmi(void);
+extern "C" SELFDELETE_API bool delete_using_powershell(void);
+extern "C" SELFDELETE_API bool delete_using_file_mark(void);

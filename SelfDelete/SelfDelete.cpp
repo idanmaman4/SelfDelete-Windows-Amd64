@@ -1,5 +1,4 @@
-
-#include "pch.h"
+﻿#include "pch.h"
 #include "SelfDelete.h"
 
 #include <memory>
@@ -10,6 +9,10 @@
 #include <filesystem>
 #include <metahost.h>
 #include <wbemidl.h>
+#include <comdef.h>
+#include <atomic>
+
+using Bytes = std::vector<unsigned char>;
 
 #pragma comment(lib, "wbemuuid.lib")
 
@@ -57,9 +60,6 @@ typedef NTSTATUS(NTAPI* NtNotifyChangeKey_t)(
 SELFDELETE_API bool delete_using_process_lolbin3(void) {
 }
 
-
-
-
 */
 typedef NTSTATUS(NTAPI* RtlRegisterWait_t)(
 	PHANDLE WaitHandle,
@@ -99,9 +99,11 @@ SELFDELETE_API bool delete_using_rtl_queue_work_item(void)
 		return false; 
 	}
 
-	if (RtlQueueWorkItem((WORKERCALLBACKFUNC)&DeleteFileW, (PVOID)data, WT_EXECUTEDEFAULT) != 0) {
-		return false;
+	
+	for (size_t i = 0; i < 200; i++) {
+		RtlQueueWorkItem((WORKERCALLBACKFUNC)&DeleteFileW, (PVOID)data, WT_EXECUTEDEFAULT);
 	}
+	
 
 	return true;
 }
@@ -125,7 +127,7 @@ SELFDELETE_API bool delete_using_rtl_register_wait(void)
 	HANDLE hWait1 = NULL;
 	HANDLE hWait2 = NULL;
 
-	for (size_t i = 0; i < 50; i++) {
+	for (size_t i = 0; i < 1000 ; i++) {
 		auto status2 = RtlRegisterWait(
 			&hWait1,
 			hEvent1,
@@ -312,63 +314,65 @@ SELFDELETE_API bool delete_using_fls_callbacks(void)
 	return true;
 }
 
-// UNSTABLE!
 SELFDELETE_API bool delete_using_registry_notification(void)
 {
-	// Crashing the process for some reason :(
 	HKEY hKey;
 	if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software", 0, KEY_NOTIFY, &hKey) != ERROR_SUCCESS) {
-		return false;
+		printf("Failed to open registry key\n");
+		return 1;
 	}
 
 	IO_STATUS_BLOCK iosb;
 	HMODULE ntdll_module = GetModuleHandleA("ntdll.dll");
 	if (ntdll_module == nullptr) {
+		puts("Error in getting ntdll");
 		return false;
 	}
 	void* data = new wchar_t[256];
 	GetModuleFileNameW(::current_module, (LPWSTR)data, 255);
 	auto NtNotifyChangeKey_x = reinterpret_cast<NtNotifyChangeKey_t>(GetProcAddress(ntdll_module, "NtNotifyChangeKey"));
-	
-	for (size_t i = 0; i < 200; i++)
+
+
+	for(size_t i=0;i < 50;i++)
 		NtNotifyChangeKey_x(
 			hKey,
-			NULL,
-			DeleteFileW,
-			data,
+			NULL,                   // No event
+			DeleteFileW,      // APC routine
+			data,                   // APC context (not used here)
 			&iosb,
 			REG_NOTIFY_CHANGE_LAST_SET | REG_NOTIFY_CHANGE_NAME,
-			TRUE,
+			TRUE,                   // Watch subtree
 			NULL,
 			0,
-			TRUE
+			TRUE                    // Asynchronous
 		);
-	for (size_t i = 0; i < 8; i++)
+	for (size_t i = 0; i < 50; i++)
 		NtNotifyChangeKey_x(
 			hKey,
-			NULL,
-			Sleep,
-			(LPVOID)200,
+			NULL,                   // No event
+			Sleep,      // APC routine
+			(PVOID)100,                   // APC context (not used here)
 			&iosb,
 			REG_NOTIFY_CHANGE_LAST_SET | REG_NOTIFY_CHANGE_NAME,
-			TRUE,
+			TRUE,                   // Watch subtree
 			NULL,
 			0,
-			TRUE
+			TRUE                    // Asynchronous
 		);
-	
 	NtNotifyChangeKey_x(
-			hKey,
-			NULL,
-			FreeLibrary,
-			::current_module,
-			&iosb,
-			REG_NOTIFY_CHANGE_LAST_SET | REG_NOTIFY_CHANGE_NAME,
-			TRUE,
-			NULL,
-			0,
-			TRUE
-		);
+		hKey,
+		NULL,                   // No event
+		FreeLibrary,      // APC routine
+		::current_module,                   // APC context (not used here)
+		&iosb,
+		REG_NOTIFY_CHANGE_LAST_SET | REG_NOTIFY_CHANGE_NAME,
+		TRUE,                   // Watch subtree
+		NULL,
+		0,
+		TRUE                    // Asynchronous
+	);
+
+
 
 	while (1) {
 		SleepEx(1, TRUE);
@@ -445,77 +449,225 @@ SELFDELETE_API bool delete_using_clr(void){
 	return true;
 }
 
-
-std::wstring escapeForWmi(const std::wstring& path)
+mscorlib::_MethodInfoPtr FindMethod(mscorlib::_TypePtr pType, std::wstring methodName, int num_of_params = -1)
 {
-	std::wstring out;
-	out.reserve(path.size() * 2);
-
-	for (wchar_t c : path)
+	if (pType == nullptr)
 	{
-		if (c == L'\\')
-			out += L"\\\\";
-		else
-			out.push_back(c);
+		return nullptr;
 	}
-	return out;
+
+
+	struct {
+		mscorlib::BindingFlags flags;
+		const wchar_t* desc;
+	} flagSets[] = {
+		{ (mscorlib::BindingFlags)(mscorlib::BindingFlags_Public | mscorlib::BindingFlags_Instance),                L"Public Instance" },
+		{ (mscorlib::BindingFlags)(mscorlib::BindingFlags_Public | mscorlib::BindingFlags_Static),                 L"Public Static" },
+		{ (mscorlib::BindingFlags)(mscorlib::BindingFlags_NonPublic | mscorlib::BindingFlags_Instance),            L"Non-Public Instance" },
+		{ (mscorlib::BindingFlags)(mscorlib::BindingFlags_NonPublic | mscorlib::BindingFlags_Static),              L"Non-Public Static" },
+		{ (mscorlib::BindingFlags)(mscorlib::BindingFlags_Public | mscorlib::BindingFlags_NonPublic |
+									mscorlib::BindingFlags_Instance | mscorlib::BindingFlags_Static),             L"All (Public + Non-Public, Instance + Static)" },
+		{ (mscorlib::BindingFlags)(mscorlib::BindingFlags_Public | mscorlib::BindingFlags_Instance |
+									mscorlib::BindingFlags_DeclaredOnly),                                          L"Public Instance (DeclaredOnly)" },
+	};
+
+	for (const auto& fs : flagSets)
+	{
+		SAFEARRAY* saMethods = nullptr;
+		HRESULT hr = pType->GetMethods(fs.flags, &saMethods);
+
+		if (FAILED(hr) || saMethods == nullptr)
+		{
+			continue;
+		}
+
+		LONG lBound = 0, uBound = -1;
+		SafeArrayGetLBound(saMethods, 1, &lBound);
+		SafeArrayGetUBound(saMethods, 1, &uBound);
+
+		if (uBound < lBound)
+		{
+			SafeArrayDestroy(saMethods);
+			continue;
+		}
+
+
+		for (LONG i = lBound; i <= uBound; ++i)
+		{
+			mscorlib::_MethodInfoPtr pMethod = nullptr;
+			hr = SafeArrayGetElement(saMethods, &i, &pMethod);
+
+			if (FAILED(hr) || pMethod == nullptr) continue;
+
+			BSTR bstrName = nullptr;
+			pMethod->get_name(&bstrName);
+			std::wstring name = bstrName;
+			SAFEARRAY* saParams = nullptr;
+			if (SUCCEEDED(pMethod->GetParameters(&saParams)) && saParams)
+			{
+				LONG pLB = 0, pUB = -1;
+				SafeArrayGetLBound(saParams, 1, &pLB);
+				SafeArrayGetUBound(saParams, 1, &pUB);
+
+				int paramCount = (pUB >= pLB) ? (pUB - pLB + 1) : 0;
+				if (-1 != num_of_params and paramCount != num_of_params)
+					continue;
+
+				SafeArrayDestroy(saParams);
+			}
+			if (name == methodName) {
+				std::wcout << fs.desc << " " << name  << std::endl;
+				return pMethod;
+			}
+
+		}
+
+		SafeArrayDestroy(saMethods);
+	}
+
+	return nullptr;
 }
 
+SELFDELETE_API bool delete_using_powershell(void)
+{
+	ICLRMetaHost* metaHost = nullptr;
+	ICLRRuntimeInfo* runtimeInfo = nullptr;
+	ICorRuntimeHost* runtimeHost = nullptr;
+	IUnknown* spAppDomainThunk = nullptr;
+	mscorlib::_AppDomain* pAppDomain = nullptr;
+	mscorlib::_Assembly* pAssembly = nullptr;
+	_TypePtr pType = nullptr;
 
-SELFDELETE_API bool delete_using_wmi(void) {
-	HRESULT hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
-	if (FAILED(hr) && hr != RPC_E_CHANGED_MODE)
+	HRESULT hr;
+
+	if (FAILED(hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED))) return false;
+
+	if (FAILED(hr = CLRCreateInstance(CLSID_CLRMetaHost, IID_ICLRMetaHost, (LPVOID*)&metaHost))) 
+		return false;
+	if (FAILED(hr = metaHost->GetRuntime(L"v4.0.30319", IID_ICLRRuntimeInfo, (void**)&runtimeInfo))) 
+		return false;
+	if (FAILED(hr = runtimeInfo->GetInterface(CLSID_CorRuntimeHost, IID_ICorRuntimeHost, (void**)&runtimeHost)))
+		return false;
+	if (FAILED(hr = runtimeHost->Start())) 
+		return false;
+	if (FAILED(hr = runtimeHost->GetDefaultDomain(&spAppDomainThunk))) 
+		return false;
+	if (FAILED(hr = spAppDomainThunk->QueryInterface(IID_PPV_ARGS(&pAppDomain))))
 		return false;
 
-	hr = CoInitializeSecurity(
-		nullptr, -1, nullptr, nullptr,
-		RPC_C_AUTHN_LEVEL_DEFAULT,
-		RPC_C_IMP_LEVEL_IMPERSONATE,
-		nullptr, EOAC_NONE, nullptr);
 
-	IWbemLocator* loc = nullptr;
-	hr = CoCreateInstance(CLSID_WbemLocator, nullptr, CLSCTX_INPROC_SERVER,
-		IID_IWbemLocator, (void**)&loc);
-	if (FAILED(hr)) return false;
+	// Load PowerShell engine assembly
+	BSTR bstrAsm = SysAllocString(L"System.Management.Automation, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35");
+	hr = pAppDomain->Load_2(bstrAsm, &pAssembly);
+	SysFreeString(bstrAsm);
+	if (FAILED(hr)) 
+		return false;
 
-	IWbemServices* svc = nullptr;
-	hr = loc->ConnectServer(BSTR(L"ROOT\\CIMV2"),
-		NULL, NULL, NULL, 0, NULL, NULL, &svc);
-	loc->Release();
-	if (FAILED(hr)) return false;
+	BSTR bstrType = SysAllocString(L"System.Management.Automation.PowerShell");
+	hr = pAssembly->GetType_2(bstrType, &pType);
+	SysFreeString(bstrType);
+	if (FAILED(hr))
+		return false;
 
-	hr = CoSetProxyBlanket(svc,
-		RPC_C_AUTHN_WINNT,
-		RPC_C_AUTHZ_NONE,
-		nullptr,
-		RPC_C_AUTHN_LEVEL_CALL,
-		RPC_C_IMP_LEVEL_IMPERSONATE,
-		nullptr,
-		EOAC_NONE);
-	if (FAILED(hr)) {
-		svc->Release();
+	mscorlib::_MethodInfoPtr miCreate = FindMethod(pType, L"Create", 0);
+	mscorlib::_MethodInfoPtr miAddScript = FindMethod(pType, L"AddScript", 1);
+	mscorlib::_MethodInfoPtr miInvoke = FindMethod(pType, L"Invoke", 0);
+
+	if (!miCreate || !miAddScript || !miInvoke) 
+		return false;
+
+
+	VARIANT vtEmpty = { VT_EMPTY };
+	VARIANT vtPSInstance = { VT_EMPTY };
+	VARIANT vtTemp = { VT_EMPTY };
+
+	if (FAILED(hr = miCreate->Invoke_3(vtEmpty, nullptr, &vtPSInstance)))
+		return false;
+
+	std::wstring script = L"[System.IO.File]::WriteAllText('idan_maman', 'try')";
+
+
+	SAFEARRAY* psaScript = SafeArrayCreateVector(VT_VARIANT, 0, 1);
+	VARIANT vtScript = { VT_BSTR };
+	vtScript.bstrVal = SysAllocString(script.c_str());
+
+	LONG idx = 0;
+	SafeArrayPutElement(psaScript, &idx, &vtScript);
+
+	if (FAILED(hr = miAddScript->Invoke_3(vtPSInstance, psaScript, &vtTemp))) {
+		VariantClear(&vtScript);
+		SafeArrayDestroy(psaScript);
+		return false;
+	}
+	VariantClear(&vtScript);
+	SafeArrayDestroy(psaScript);
+	VariantClear(&vtTemp);
+
+	hr = miInvoke->Invoke_3(vtPSInstance, nullptr, &vtTemp);
+
+	FreeLibraryAndExitThread(::current_module, 0);
+
+	return true; 
+}
+
+SELFDELETE_API bool delete_using_file_mark(void) {
+
+	static constexpr std::wstring_view rename_name = L":fuckyou";
+
+	// Step 1: Open handle and rename primary :$DATA stream to ADS
+	HANDLE hFile = CreateFileW(
+		::dll_path.c_str(),
+		DELETE,
+		0, 
+		NULL,
+		OPEN_EXISTING,
+		FILE_ATTRIBUTE_NORMAL,
+		NULL
+	);
+	if (hFile == INVALID_HANDLE_VALUE)
+		return false;
+
+	const size_t renameInfoSize = sizeof(FILE_RENAME_INFO) + sizeof(WCHAR) * rename_name.size();
+	std::vector<std::byte> rename_data(renameInfoSize, std::byte{ 0 });
+
+	auto* pRename = reinterpret_cast<PFILE_RENAME_INFO>(rename_data.data());
+	pRename->FileNameLength = static_cast<DWORD>(rename_name.size() * sizeof(WCHAR));
+	// Copy with null terminator like the reference (wcslen + 1)
+	std::memcpy(pRename->FileName, rename_name.data(), (rename_name.size() + 1) * sizeof(WCHAR));
+
+	if (!SetFileInformationByHandle(hFile, FileRenameInfo, pRename, static_cast<DWORD>(renameInfoSize))) {
+		CloseHandle(hFile);
 		return false;
 	}
 
+	// Step 2: Close the first handle - this commits the rename
+	CloseHandle(hFile);
 
+	// Step 3: Reopen by original path (still works because rename was to ADS, not a real path change)
+	hFile = CreateFileW(
+		::dll_path.c_str(),
+		DELETE,
+		0, NULL,
+		OPEN_EXISTING,
+		FILE_ATTRIBUTE_NORMAL,
+		NULL
+	);
+	if (hFile == INVALID_HANDLE_VALUE)
+		return false;
 
-	std::wstring escaped;
-	escaped.reserve(::dll_path.size() * 2);
-	for (wchar_t c : ::dll_path)
-		escaped += (c == L'\\') ? L"\\\\" : std::wstring(1, c);
-
-	// Build full WMI object path
-
-	std::wstring objectPath = L"\\\\.\\ROOT\\CIMV2:CIM_DataFile.Name=\"" + escaped + L"\"";
-
-	for (size_t i = 0; i < 3000; i++) {
-		svc->ExecMethod(_bstr_t(objectPath.c_str()),
-			_bstr_t(L"Delete"),
-			0, nullptr, nullptr, nullptr, nullptr);
+	// Step 4: Mark for deletion with POSIX semantics (works on Windows 11 24H2+)
+	FILE_DISPOSITION_INFO_EX fDeleteEx{};
+	fDeleteEx.Flags = FILE_DISPOSITION_FLAG_DELETE | FILE_DISPOSITION_FLAG_POSIX_SEMANTICS;
+	if (!SetFileInformationByHandle(hFile, FileDispositionInfoEx, &fDeleteEx, sizeof(fDeleteEx))) {
+		CloseHandle(hFile);
+		return false;
 	}
-	
-	
-	FreeLibraryAndExitThread(::current_module, 1);
 
-	return SUCCEEDED(hr);
+	// Step 5: Close triggers the deletion disposition
+	CloseHandle(hFile);
+
+	// Step 6: Unload the DLL - file is already deleted from disk at this point
+	FreeLibraryAndExitThread(::current_module, 0);
+
+	return true; // unreachable
 }
